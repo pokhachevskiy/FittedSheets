@@ -41,7 +41,9 @@ public class SheetViewController: UIViewController {
        didSet {
            self.updateAccessibility()
        }
-   }
+    }
+
+    public var contentHeightChanged: ((CGFloat) -> Void)?
     /// If true you can pull using UIControls (so you can grab and drag a button to control the sheet)
     public var shouldRecognizePanGestureWithUIControls: Bool = true
     
@@ -86,14 +88,29 @@ public class SheetViewController: UIViewController {
     public private(set) var contentViewController: SheetContentViewController
     var overlayView = UIView()
     var blurView = UIVisualEffectView()
-    var overlayTapView = UIView()
+    public private(set) var overlayTapView = UIView()
     var overlayTapGesture: UITapGestureRecognizer?
     private var contentViewHeightConstraint: NSLayoutConstraint!
+
+    private var contentViewHeightConstant: CGFloat = 0 {
+        didSet {
+            contentViewHeightConstraint.constant = contentViewHeightConstant
+            contentHeightChanged?(contentViewHeightConstant)
+        }
+    }
+
+
     
     /// The child view controller's scroll view we are watching so we can override the pull down/up to work on the sheet when needed
     private weak var childScrollView: UIScrollView?
+
+    public var keyboardHeightChanged: ((CGFloat) -> Void)?
     
-    private var keyboardHeight: CGFloat = 0
+    private var keyboardHeight: CGFloat = 0 {
+        didSet {
+            keyboardHeightChanged?(keyboardHeight)
+        }
+    }
     private var firstPanPoint: CGPoint = CGPoint.zero
     private var panOffset: CGFloat = 0
     private var panGestureRecognizer: InitialTouchPanGestureRecognizer!
@@ -286,6 +303,11 @@ public class SheetViewController: UIViewController {
     }
     
     @objc func panned(_ gesture: UIPanGestureRecognizer) {
+        if keyboardHeight != 0 {
+            view.endEditing(true)
+            gesture.state = .failed
+            return
+        }
         let point = gesture.translation(in: gesture.view?.superview)
         if gesture.state == .began {
             self.firstPanPoint = point
@@ -315,7 +337,7 @@ public class SheetViewController: UIViewController {
             case .cancelled, .failed:
                 UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseOut], animations: {
                     self.contentViewController.view.transform = CGAffineTransform.identity
-                    self.contentViewHeightConstraint.constant = self.height(for: self.currentSize)
+                    self.contentViewHeightConstant = self.height(for: self.currentSize)
                     self.transition.setPresentor(percentComplete: 0)
                     self.overlayView.alpha = 1
                 }, completion: { _ in
@@ -323,7 +345,7 @@ public class SheetViewController: UIViewController {
                 })
             
             case .began, .changed:
-                self.contentViewHeightConstraint.constant = newHeight
+                self.contentViewHeightConstant = newHeight
                 
                 if offset > 0 {
                     let percent = max(0, min(1, offset / max(1, newHeight)))
@@ -384,7 +406,7 @@ public class SheetViewController: UIViewController {
                 let newContentHeight = self.height(for: newSize)
                 UIView.animate(withDuration: animationDuration, delay: 0, options: [.curveEaseOut], animations: {
                     self.contentViewController.view.transform = CGAffineTransform.identity
-                    self.contentViewHeightConstraint.constant = newContentHeight
+                    self.contentViewHeightConstant = newContentHeight
                     self.transition.setPresentor(percentComplete: 0)
                     self.overlayView.alpha = 1
                     self.view.layoutIfNeeded()
@@ -428,6 +450,17 @@ public class SheetViewController: UIViewController {
         let animationCurve:UIView.AnimationOptions = UIView.AnimationOptions(rawValue: animationCurveRaw)
         
         self.contentViewController.adjustForKeyboard(height: self.keyboardHeight)
+
+        guard autoAdjustToKeyboard else {
+            UIView.animate(
+                withDuration: 0.3,
+                delay: 0,
+                options: animationCurve,
+                animations: {
+                    self.view.layoutIfNeeded()
+                })
+            return
+        }
         self.resize(to: self.currentSize, duration: duration, options: animationCurve, animated: true, complete: {
             self.resize(to: self.currentSize)
         })
@@ -476,8 +509,8 @@ public class SheetViewController: UIViewController {
         
         if animated {
             UIView.animate(withDuration: duration, delay: 0, options: options, animations: { [weak self] in
-                guard let self = self, let constraint = self.contentViewHeightConstraint else { return }
-                constraint.constant = newHeight
+                guard let self = self else { return }
+                self.contentViewHeightConstant = newHeight
                 self.view.layoutIfNeeded()
             }, completion: { _ in
                 if previousSize != size {
@@ -488,7 +521,7 @@ public class SheetViewController: UIViewController {
             })
         } else {
             UIView.performWithoutAnimation {
-                self.contentViewHeightConstraint?.constant = self.height(for: size)
+                self.contentViewHeightConstant = self.height(for: size)
                 self.contentViewController.view.layoutIfNeeded()
             }
             complete?()
