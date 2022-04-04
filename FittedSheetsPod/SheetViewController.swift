@@ -367,7 +367,13 @@ public class SheetViewController: UIViewController {
                 
                 guard finalHeight > 0 || !self.dismissOnPull else {
                     // Dismiss
-                    UIView.animate(withDuration: animationDuration, delay: 0, options: [.curveEaseOut], animations: {
+                    UIView.animate(
+                        withDuration: animationDuration,
+                        delay: 0,
+                        usingSpringWithDamping: self.options.transitionDampening,
+                        initialSpringVelocity: self.options.transitionVelocity,
+                        options: self.options.transitionAnimationOptions,
+                        animations: {
                         self.contentViewController.view.transform = CGAffineTransform(translationX: 0, y: self.contentViewController.view.bounds.height)
                         self.view.backgroundColor = UIColor.clear
                         self.transition.setPresentor(percentComplete: 1)
@@ -511,7 +517,7 @@ public class SheetViewController: UIViewController {
             UIView.animate(withDuration: duration, delay: 0, options: options, animations: { [weak self] in
                 guard let self = self else { return }
                 self.contentViewHeightConstant = newHeight
-                self.view.layoutIfNeeded()
+                self.contentViewController.view.layoutIfNeeded()
             }, completion: { _ in
                 if previousSize != size {
                     self.sizeChanged?(self, size, newHeight)
