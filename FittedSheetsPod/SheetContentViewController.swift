@@ -58,9 +58,6 @@ public class SheetContentViewController: UIViewController {
     
     public override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        UIView.performWithoutAnimation {
-            self.view.layoutIfNeeded()
-        }
         self.updatePreferredHeight()
     }
     
