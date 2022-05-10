@@ -98,8 +98,8 @@ public class SheetViewController: UIViewController {
             contentHeightChanged?(contentViewHeightConstant)
         }
     }
-
-
+    
+    public var transformYChanged: ((CGFloat) -> Void)?
     
     /// The child view controller's scroll view we are watching so we can override the pull down/up to work on the sheet when needed
     private weak var childScrollView: UIScrollView?
@@ -337,6 +337,7 @@ public class SheetViewController: UIViewController {
             case .cancelled, .failed:
                 UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseOut], animations: {
                     self.contentViewController.view.transform = CGAffineTransform.identity
+                    self.transformYChanged?(-1)
                     self.contentViewHeightConstant = self.height(for: self.currentSize)
                     self.transition.setPresentor(percentComplete: 0)
                     self.overlayView.alpha = 1
@@ -352,7 +353,9 @@ public class SheetViewController: UIViewController {
                     self.transition.setPresentor(percentComplete: percent)
                     self.overlayView.alpha = 1 - percent
                     self.contentViewController.view.transform = CGAffineTransform(translationX: 0, y: offset)
+                    transformYChanged?(offset)
                 } else {
+                    transformYChanged?(-1)
                     self.contentViewController.view.transform = CGAffineTransform.identity
                 }
             case .ended:
@@ -369,11 +372,12 @@ public class SheetViewController: UIViewController {
                     // Dismiss
                     UIView.animate(withDuration: animationDuration, delay: 0, options: [.curveEaseOut], animations: {
                         self.contentViewController.view.transform = CGAffineTransform(translationX: 0, y: self.contentViewController.view.bounds.height)
+                        self.transformYChanged?(self.contentViewController.view.bounds.height)
                         self.view.backgroundColor = UIColor.clear
                         self.transition.setPresentor(percentComplete: 1)
                         self.overlayView.alpha = 0
                     }, completion: { complete in
-                        self.attemptDismiss(animated: false)
+                        self.attemptDismiss(animated: true)
                     })
                     return
                 }
@@ -406,6 +410,7 @@ public class SheetViewController: UIViewController {
                 let newContentHeight = self.height(for: newSize)
                 UIView.animate(withDuration: animationDuration, delay: 0, options: [.curveEaseOut], animations: {
                     self.contentViewController.view.transform = CGAffineTransform.identity
+                    self.transformYChanged?(-1)
                     self.contentViewHeightConstant = newContentHeight
                     self.transition.setPresentor(percentComplete: 0)
                     self.overlayView.alpha = 1
@@ -554,6 +559,7 @@ public class SheetViewController: UIViewController {
         self.resize(to: self.currentSize, animated: false)
         let contentView = self.contentViewController.contentView
         contentView.transform = CGAffineTransform(translationX: 0, y: contentView.bounds.height)
+        self.transformYChanged?(contentView.bounds.height)
         self.overlayView.alpha = 0
         self.updateOrderedSizes()
         
@@ -561,6 +567,7 @@ public class SheetViewController: UIViewController {
             withDuration: duration,
             animations: {
                 contentView.transform = .identity
+                self.transformYChanged?(-1)
                 self.overlayView.alpha = 1
             },
             completion: { _ in
@@ -578,6 +585,7 @@ public class SheetViewController: UIViewController {
             withDuration: duration,
             animations: {
                 contentView.transform = CGAffineTransform(translationX: 0, y: contentView.bounds.height)
+                self.transformYChanged?(contentView.bounds.height)
                 self.overlayView.alpha = 0
             },
             completion: { _ in
